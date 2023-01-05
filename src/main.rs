@@ -2,17 +2,25 @@ mod api;
 mod models;
 mod repository;
 
-use actix_web::{get, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware::Logger, web::Data, App, HttpServer};
+use api::user_api::{create_user};
+use repository::mongodb_repo::MongoRepo;
 
-    #[get("/")]
-    async fn hello() -> impl Responder {
-        HttpResponse::Ok().json("Hello from rust and mongoDB")
-    }
-
-    #[actix_web::main]
-    async fn main() -> std::io::Result<()> {
-        HttpServer::new(|| App::new().service(hello))
-            .bind(("localhost", 8080))?
-            .run()
-            .await
-    }
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_BACKTRACE", "1");
+    env_logger::init();
+    let db = MongoRepo::init().await;
+    let db_data = Data::new(db);
+    HttpServer::new(move || {
+        let logger = Logger::default();
+        App::new()
+            .wrap(logger)
+            .app_data(db_data.clone())
+            .service(create_user)
+    })
+    .bind(("127.0.0.1",8080))?
+    .run()
+    .await
+}
